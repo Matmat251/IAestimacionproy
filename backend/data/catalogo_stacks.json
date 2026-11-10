@@ -1,0 +1,22 @@
+{
+  "hosting_compartido": {
+    "permitido": ["PHP", "Laravel", "MySQL", "MariaDB", "Composer", "GitHub Actions", "Sharp_via_PHP_GD", "HTML/CSS/JS"],
+    "prohibido": ["Docker", "Kubernetes", "Nginx_propio", "Nginx", "Kafka", "Redis", "microservicios"],
+    "nota": "Verificar si el plan incluye Node.js antes de proponerlo"
+  },
+  "vps": {
+    "permitido": ["Node.js", "PHP", "FastAPI (Python)", "FastAPI", "Python", "React", "Next.js", "TypeScript", "Docker", "Nginx", "PostgreSQL", "MySQL", "Redis"],
+    "prohibido": ["Kubernetes", "Kafka", "microservicios"]
+  },
+  "cloud": {
+    "permitido": ["servicios_gestionados", "React", "React Native", "Next.js", "TypeScript", "FastAPI (Python)", "FastAPI", "Node.js", "PostgreSQL", "PostgreSQL + pgvector", "Redis", "Docker", "Docker + CI/CD", "Kubernetes", "Kafka", "API Gateway / Colas de mensajería", "LangGraph"],
+    "prohibido": []
+  },
+  "umbral_complejidad": {
+    "kubernetes_kafka_microservicios": {
+      "usuarios_concurrentes_explicitos": 1000,
+      "eventos_por_dia_explicitos": 500000,
+      "equipos_paralelos": 3
+    }
+  }
+}

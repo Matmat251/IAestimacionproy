@@ -1,0 +1,6 @@
+nombre,tecnologias,complejidad,fase,horas_reales
+Portal Clientes,React Node PostgreSQL,media,Desarrollo,120
+App Movil Logistica,Flutter Python FastAPI,alta,Desarrollo,240
+Integracion ERP,Java Spring Oracle,alta,Analisis,80
+Landing Page Campaña,HTML CSS JavaScript,baja,Desarrollo,40
+API Gateway Pagos,Go Kubernetes Docker,media,Diseno,60
