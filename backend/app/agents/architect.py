@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..models import DiscardedAlternative, Risk, TechJustification
-from ..reference import load_stack_catalog
+from ..reference import load_knowledge_text, load_stack_catalog
 from .llm import call_llm
 from .state import BASE_ACTIVITIES, BASE_RISKS, AgentState
 
@@ -161,6 +161,7 @@ def normalize_profile(raw_profile: str, valid_profiles: list[str]) -> str:
 def arquitecto_node(state: AgentState) -> dict[str, Any]:
     p = state["request"].project
     notes: list[str] = []
+    similar_history = state.get("similar_history", [])
     valid_profiles = list(state.get("rates", {}).keys()) or [
         "Analista funcional",
         "Arquitecto / Tech Lead",
@@ -214,6 +215,12 @@ def arquitecto_node(state: AgentState) -> dict[str, Any]:
 
     if settings.groq_api_key:
         profiles_list_str = ", ".join(valid_profiles)
+        history_summary = "\n".join(
+            f"- {h.get('nombre', '')} ({h.get('fase', '')}): {h.get('tecnologias', '')}, "
+            f"complejidad={h.get('complejidad', '')}, horas_reales={h.get('horas_reales', 0)}h"
+            for h in similar_history[:8]
+        ) or "No hay registros históricos coincidentes."
+
         prompt = (
             f"Diseña la WBS (actividades encadenadas por dependencias), recomienda el stack tecnológico "
             f"ideal según el perfil de infraestructura y requerimientos, e identifica riesgos:\n"
@@ -222,6 +229,11 @@ def arquitecto_node(state: AgentState) -> dict[str, Any]:
             f"Restricciones: {p.constraints}\nTrabajo ya realizado: {p.completed_work}\n"
             f"Perfil de infraestructura: {infra_profile}\n"
             f"Requerimientos detectados: {json.dumps(raw_reqs[:8], ensure_ascii=False)}\n\n"
+            f"PROYECTOS HISTÓRICOS SIMILARES (RAG):\n{history_summary}\n\n"
+            f"INSTRUCCIONES PARA LA WBS COMPLETA:\n"
+            f"- Genera una WBS COMPLETA que cubra todas las fases clave: 'Análisis', 'Diseño', 'Desarrollo', 'QA', 'Despliegue' y opcionalmente 'Gestión de proyecto' (al menos 5 a 8 actividades encadenadas por dependencias 'depends_on').\n"
+            f"- Utiliza los rangos de horas (horas_min, horas_tipicas, horas_max) de benchmarks_actividades.csv como (optimistic_hours, most_likely_hours, pessimistic_hours).\n"
+            f"- En 'rationale' de cada actividad, cita explícitamente el 'tipo_actividad' del benchmark o el proyecto histórico de referencia (ej. 'Benchmark: levantamiento_requisitos (16-32-64h)', 'Referencia histórica: Portal Clientes').\n\n"
             f"7 REGLAS ESTRICTAS DE ARQUITECTURA:\n"
             f"1. Stack más austero: Escoge la solución tecnológica más simple y económica que resuelva el alcance.\n"
             f"2. Respetar catálogo de infraestructura: Para '{infra_profile}' están estrictamente prohibidas: {json.dumps(prohibido_list)}.\n"
@@ -230,7 +242,10 @@ def arquitecto_node(state: AgentState) -> dict[str, Any]:
             f"5. Alternativas descartadas: Cada tecnología recomendada debe incluir al menos una alternativa descartada con su motivo en 'alternativas_descartadas'.\n"
             f"6. Metadatos de Actividades: Cada actividad debe especificar 'categoria', 'requisitos_ids' y 'api_documentada'.\n"
             f"7. Exclusión de supuestos cuantitativos: Ignora supuestos numéricos no confirmados por el cliente.\n\n"
-            f"Regla de perfiles: Para el campo 'profile' de cada actividad, asigna uno de los siguientes roles exactos: {profiles_list_str}."
+            f"Regla de perfiles: Para el campo 'profile' de cada actividad, asigna uno de los siguientes roles exactos: {profiles_list_str}.\n\n"
+            f"BASE DE CONOCIMIENTO (usa estos rangos para optimistic/most_likely/pessimistic_hours; "
+            f"multiplica por la cantidad de unidades y aplica factores solo si el proyecto lo indica; "
+            f"cita el tipo_actividad y factor usados en 'rationale'):\n{load_knowledge_text()}"
         )
         try:
             res = call_llm(prompt, ArchResponse)
@@ -257,7 +272,7 @@ def arquitecto_node(state: AgentState) -> dict[str, Any]:
                 risks = [r.model_dump() for r in res.risks]
 
             if res.activities:
-                activities = [
+                llm_acts = [
                     {
                         "id": a.id,
                         "phase": a.phase,
@@ -274,6 +289,32 @@ def arquitecto_node(state: AgentState) -> dict[str, Any]:
                     }
                     for a in res.activities
                 ]
+
+                has_qa = any(act["phase"].strip().lower() == "qa" for act in llm_acts)
+                if len(llm_acts) < 4 or not has_qa:
+                    # Salvaguarda: complementar fases faltantes desde BASE_ACTIVITIES
+                    existing_phases = {act["phase"].strip().lower() for act in llm_acts}
+                    existing_ids = {act["id"] for act in llm_acts}
+                    supplemented = []
+                    for b_act in deepcopy(BASE_ACTIVITIES):
+                        b_phase = b_act["phase"].strip().lower()
+                        if b_phase not in existing_phases:
+                            cand_id = b_act["id"]
+                            c_num = 1
+                            while cand_id in existing_ids:
+                                cand_id = f"A{len(existing_ids) + c_num}"
+                                c_num += 1
+                            existing_ids.add(cand_id)
+                            new_act = deepcopy(b_act)
+                            new_act["id"] = cand_id
+                            if llm_acts:
+                                new_act["depends_on"] = [llm_acts[-1]["id"]]
+                            supplemented.append(new_act)
+                            existing_phases.add(b_phase)
+                    llm_acts.extend(supplemented)
+                    notes.append("Se complementaron fases faltantes en la WBS con actividades base de referencia (salvaguarda WBS).")
+
+                activities = llm_acts
         except Exception:
             logger.exception("Error llamando al Arquitecto con LLM")
             notes.append("Arquitecto LLM no disponible; se usó WBS y recomendación tecnológica demostrativa.")

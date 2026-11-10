@@ -32,6 +32,10 @@ export type Plan = {
   roles: RoleCost[];
   duration_weeks: number;
   total_cost: number;
+  p50_hours?: number;
+  p80_hours?: number;
+  p50_cost?: number;
+  p80_cost?: number;
 };
 
 export type Audit = {
@@ -69,6 +73,16 @@ export type Requirement = {
   confidence: number;
 };
 
+export type RagEvidence = {
+  nombre: string;
+  tecnologias?: string;
+  complejidad?: string;
+  fase?: string;
+  horas_reales?: number;
+  similarity?: number;
+  source?: "historico_csv" | "estimacion_aprobada";
+};
+
 export type DraftResponse = {
   project_name: string;
   status: "needs_clarification" | "ready_for_review";
@@ -85,6 +99,7 @@ export type DraftResponse = {
   tech_justifications?: TechJustification[];
   plan: Plan | null;
   audit: Audit | null;
+  rag_evidence?: RagEvidence[];
 };
 
 export type SavedEstimation = {
@@ -94,4 +109,25 @@ export type SavedEstimation = {
   reviewer: string;
   comment: string;
   created_at: string;
+};
+
+export type KnowledgeSummary = {
+  benchmarks_count: number;
+  phases_distribution: Array<{
+    fase: string;
+    pct_min: number;
+    pct_tipico: number;
+    pct_max: number;
+    nota?: string;
+  }>;
+  distribucion_fases?: Array<{
+    fase: string;
+    pct_min: number;
+    pct_tipico: number;
+    pct_max: number;
+    nota?: string;
+  }>;
+  factors_count: number;
+  historical_projects_count: number;
+  benchmarks_actividades?: Array<Record<string, any>>;
 };

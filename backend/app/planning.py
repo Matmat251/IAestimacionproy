@@ -1,4 +1,5 @@
 import math
+import random
 from typing import Any
 
 from .models import Activity, Plan, RoleCost
@@ -61,7 +62,45 @@ def build_plan(activities: list[Activity], rates: dict[str, dict[str, Any]]) -> 
 
     duration_weeks = round(critical_path_hours(activities) / 40.0, 1)
     total_cost = round(sum(r.cost for r in roles), 2)
-    return Plan(roles=roles, duration_weeks=duration_weeks, total_cost=total_cost)
+
+    # Simulación Monte Carlo (1,000 iteraciones deterministas con seed=42)
+    p50_hours = 0.0
+    p80_hours = 0.0
+    p50_cost = 0.0
+    p80_cost = 0.0
+
+    if activities:
+        rng = random.Random(42)
+        samples: list[float] = []
+        for _ in range(1000):
+            sim_total = 0.0
+            for a in activities:
+                low = min(a.optimistic_hours, a.most_likely_hours, a.pessimistic_hours)
+                high = max(a.optimistic_hours, a.most_likely_hours, a.pessimistic_hours)
+                mode = a.most_likely_hours
+                if low == high:
+                    sim_total += low
+                else:
+                    sim_total += rng.triangular(low, high, mode)
+            samples.append(sim_total)
+        samples.sort()
+        p50_hours = round(samples[500], 1)
+        p80_hours = round(samples[800], 1)
+
+        total_expected = sum(a.expected_hours for a in activities)
+        avg_rate = (total_cost / total_expected) if total_expected > 0 else 0.0
+        p50_cost = round(p50_hours * avg_rate, 2)
+        p80_cost = round(p80_hours * avg_rate, 2)
+
+    return Plan(
+        roles=roles,
+        duration_weeks=duration_weeks,
+        total_cost=total_cost,
+        p50_hours=p50_hours,
+        p80_hours=p80_hours,
+        p50_cost=p50_cost,
+        p80_cost=p80_cost,
+    )
 
 
 def validate_estimation_rules(

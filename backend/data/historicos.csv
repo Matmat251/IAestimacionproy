@@ -1,6 +1,19 @@
 nombre,tecnologias,complejidad,fase,horas_reales
 Portal Clientes,React Node PostgreSQL,media,Desarrollo,120
 App Movil Logistica,Flutter Python FastAPI,alta,Desarrollo,240
-Integracion ERP,Java Spring Oracle,alta,Analisis,80
+Integracion ERP SAP,Java Spring Oracle,alta,Analisis,80
 Landing Page Campaña,HTML CSS JavaScript,baja,Desarrollo,40
 API Gateway Pagos,Go Kubernetes Docker,media,Diseno,60
+Ecommerce B2C Pasarela,Next.js Node Stripe PostgreSQL,alta,Desarrollo,180
+Sistema Reservas Web,React Python FastAPI PostgreSQL,media,Desarrollo,110
+Dashboard Analitico BI,React Python BI BigQuery,media,Desarrollo,90
+Intranet Corporativa PHP,PHP Laravel MySQL,media,Desarrollo,130
+CRM Ventas Cloud,TypeScript React Node PostgreSQL,alta,Desarrollo,210
+Portal Proveedores,Vue.js Java Spring PostgreSQL,media,Desarrollo,140
+App Delivery GPS,React Native Node MongoDB,alta,Desarrollo,200
+Automatizacion Documental IA,Python FastAPI LangChain PostgreSQL,alta,Desarrollo,160
+Portal Clientes,React Node PostgreSQL,media,QA,45
+Ecommerce B2C Pasarela,Next.js Node Stripe PostgreSQL,alta,QA,60
+Integracion ERP SAP,Java Spring Oracle,alta,Desarrollo,190
+Sistema Reservas Web,React Python FastAPI PostgreSQL,media,Diseno,35
+Automatizacion Documental IA,Python FastAPI LangChain PostgreSQL,alta,Analisis,50

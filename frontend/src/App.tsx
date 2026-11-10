@@ -19,6 +19,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [reviewState, setReviewState] = useState("");
+  const [isWbsDirty, setIsWbsDirty] = useState(false);
 
   const [ratesCount, setRatesCount] = useState<number | null>(null);
   const [historyCount, setHistoryCount] = useState<number | null>(null);
@@ -69,6 +70,7 @@ function App() {
       if (!response.ok)
         throw new Error(`No se pudo generar el borrador (${response.status}).`);
       setDraft(await response.json());
+      setIsWbsDirty(false);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Error de conexión con el backend.",
@@ -76,6 +78,53 @@ function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function recalculate() {
+    if (!draft) return;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`${API}/api/estimate/recalculate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      if (!response.ok)
+        throw new Error(`Error al recalcular (${response.status}).`);
+      const updatedDraft = await response.json();
+      setDraft(updatedDraft);
+      setIsWbsDirty(false);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Error al recalcular la estimación.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function updateActivityHours(
+    index: number,
+    field: "optimistic_hours" | "most_likely_hours" | "pessimistic_hours",
+    value: number,
+  ) {
+    if (!draft) return;
+    const newActivities = [...draft.activities];
+    const act = { ...newActivities[index], [field]: Math.max(0, value) };
+    act.expected_hours = Number(
+      ((act.optimistic_hours + 4 * act.most_likely_hours + act.pessimistic_hours) / 6).toFixed(1)
+    );
+    newActivities[index] = act;
+    const newTotal = Number(
+      newActivities.reduce((acc, a) => acc + a.expected_hours, 0).toFixed(1)
+    );
+    setDraft({
+      ...draft,
+      activities: newActivities,
+      total_expected_hours: newTotal,
+    });
+    setIsWbsDirty(true);
   }
 
   async function review(approved: boolean) {
@@ -174,6 +223,7 @@ function App() {
       const data = await res.json();
       if (data.draft) {
         setDraft(data.draft);
+        setIsWbsDirty(false);
         setForm((f) => ({
           ...f,
           name: data.draft.project_name || f.name,
@@ -501,6 +551,18 @@ function App() {
                   </strong>
                 </div>
                 <div>
+                  <span>P50 (Esperado)</span>
+                  <strong style={{ color: "#167f73" }}>
+                    {draft.plan?.p50_hours ?? draft.total_expected_hours} <small>h</small> · ${draft.plan?.p50_cost?.toLocaleString() ?? draft.plan?.total_cost?.toLocaleString() ?? "0"}
+                  </strong>
+                </div>
+                <div>
+                  <span>P80 (Precio Cerrado)</span>
+                  <strong style={{ color: "#0958d9" }}>
+                    {draft.plan?.p80_hours ?? draft.total_expected_hours} <small>h</small> · ${draft.plan?.p80_cost?.toLocaleString() ?? draft.plan?.total_cost?.toLocaleString() ?? "0"}
+                  </strong>
+                </div>
+                <div>
                   <span>Requisitos</span>
                   <strong>{draft.requirements.length}</strong>
                 </div>
@@ -692,7 +754,26 @@ function App() {
               )}
 
               {/* Desglose de actividades */}
-              <h3>Desglose WBS y Ruta Crítica</h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", marginBottom: "8px", flexWrap: "wrap", gap: "8px" }}>
+                <h3 style={{ margin: 0 }}>Desglose WBS y Ruta Crítica</h3>
+                <button
+                  className={isWbsDirty ? "primary" : "secondary"}
+                  onClick={recalculate}
+                  disabled={loading}
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    borderColor: isWbsDirty ? "#167f73" : "#dce5e4",
+                    backgroundColor: isWbsDirty ? "#167f73" : "#f8faf9",
+                    color: isWbsDirty ? "#fff" : "#167f73",
+                    cursor: "pointer",
+                  }}
+                  title="Recalcula ruta crítica, personal, costos, Monte Carlo P50/P80 y auditoría"
+                >
+                  🔄 Recalcular Plan y Auditoría {isWbsDirty && "(cambios pendientes)"}
+                </button>
+              </div>
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -717,8 +798,37 @@ function App() {
                         <td>{a.profile}</td>
                         <td>{a.depends_on.length > 0 ? a.depends_on.join(", ") : "Inicio"}</td>
                         <td>
-                          {a.optimistic_hours} / {a.most_likely_hours} /{" "}
-                          {a.pessimistic_hours}
+                          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={a.optimistic_hours}
+                              onChange={(e) => updateActivityHours(i, "optimistic_hours", parseFloat(e.target.value) || 0)}
+                              style={{ width: "42px", padding: "2px 4px", fontSize: "11px", textAlign: "center", borderRadius: "4px", border: "1px solid #dce5e4" }}
+                              title="Horas Optimistas (O)"
+                            />
+                            <span>/</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={a.most_likely_hours}
+                              onChange={(e) => updateActivityHours(i, "most_likely_hours", parseFloat(e.target.value) || 0)}
+                              style={{ width: "42px", padding: "2px 4px", fontSize: "11px", textAlign: "center", fontWeight: "bold", borderRadius: "4px", border: "1px solid #dce5e4" }}
+                              title="Horas Más Probables (M)"
+                            />
+                            <span>/</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={a.pessimistic_hours}
+                              onChange={(e) => updateActivityHours(i, "pessimistic_hours", parseFloat(e.target.value) || 0)}
+                              style={{ width: "42px", padding: "2px 4px", fontSize: "11px", textAlign: "center", borderRadius: "4px", border: "1px solid #dce5e4" }}
+                              title="Horas Pesimistas (P)"
+                            />
+                          </div>
                         </td>
                         <td className="hours">{a.expected_hours} h</td>
                       </tr>

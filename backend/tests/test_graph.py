@@ -167,3 +167,37 @@ def test_api_endpoints_full_lifecycle(client):
     assert r_xlsx.status_code == 200
     assert "spreadsheetml" in r_xlsx.headers["content-type"]
     assert len(r_xlsx.content) > 1000
+
+
+def test_api_estimate_recalculate_and_rag_evidence(client):
+    draft_payload = {
+        "project": {
+            "name": "Portal Clientes Web",
+            "description": "Portal para consulta de facturas y descarga de comprobantes en tiempo real.",
+            "scope": "Autenticacion y reportes",
+            "technology": "React Node PostgreSQL",
+            "integrations": "ERP SAP",
+            "constraints": "Hosting VPS",
+        }
+    }
+    r_draft = client.post("/api/estimate/draft", json=draft_payload)
+    assert r_draft.status_code == 200
+    draft_data = r_draft.json()
+    assert "rag_evidence" in draft_data
+    assert len(draft_data["rag_evidence"]) > 0
+    assert draft_data["plan"]["p50_hours"] > 0
+    assert draft_data["plan"]["p80_hours"] >= draft_data["plan"]["p50_hours"]
+
+    # Modificar horas de una actividad y recalcular
+    old_hours = draft_data["total_expected_hours"]
+    draft_data["activities"][0]["most_likely_hours"] += 20.0
+    draft_data["activities"][0]["pessimistic_hours"] += 30.0
+
+    r_recalc = client.post("/api/estimate/recalculate", json=draft_data)
+    assert r_recalc.status_code == 200
+    recalc_data = r_recalc.json()
+    assert recalc_data["total_expected_hours"] > old_hours
+    assert recalc_data["plan"]["p50_hours"] > 0
+    assert recalc_data["plan"]["p80_hours"] >= recalc_data["plan"]["p50_hours"]
+    assert recalc_data["audit"] is not None
+

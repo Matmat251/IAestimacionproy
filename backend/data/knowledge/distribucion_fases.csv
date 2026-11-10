@@ -1,0 +1,7 @@
+fase,pct_min,pct_tipico,pct_max,nota
+Gestión de proyecto,8,12,18,"Planificación, seguimiento, reuniones"
+Análisis,10,12,20,"Requisitos y alcance (ISBSG: Specify)"
+Diseño,10,12,20,"Arquitectura, datos, UX"
+Desarrollo,30,40,50,"Construcción + pruebas unitarias (ISBSG: Build)"
+QA,12,20,30,"Pruebas funcionales, integración, UAT"
+Despliegue,5,6,10,"Puesta en producción y transición"

@@ -1,15 +1,86 @@
+from collections import Counter
 import csv
 import io
 import json
+import math
 from pathlib import Path
 import re
-from typing import Literal
+from typing import Any, Literal
+import unicodedata
 import openpyxl
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TARIFAS_PATH = DATA_DIR / "tarifas.csv"
 HISTORICOS_PATH = DATA_DIR / "historicos.csv"
 CATALOGO_STACKS_PATH = DATA_DIR / "catalogo_stacks.json"
+KNOWLEDGE_DIR = DATA_DIR / "knowledge"
+
+
+def load_knowledge_text() -> str:
+    """Devuelve los CSV de conocimiento como texto compacto para el prompt del LLM."""
+    parts = []
+    for name in ("benchmarks_actividades.csv", "distribucion_fases.csv", "factores_ajuste.csv"):
+        path = KNOWLEDGE_DIR / name
+        if path.exists():
+            parts.append(f"### {name}\n{path.read_text(encoding='utf-8').strip()}")
+    return "\n\n".join(parts)
+
+
+def load_knowledge_summary() -> dict[str, Any]:
+    """Devuelve un resumen consolidado de la base de conocimiento para la API y UI."""
+    benchmarks_path = KNOWLEDGE_DIR / "benchmarks_actividades.csv"
+    benchmarks_rows: list[dict[str, Any]] = []
+    if benchmarks_path.exists():
+        with open(benchmarks_path, mode="r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            benchmarks_rows = [
+                {
+                    "tipo_actividad": (row.get("tipo_actividad") or "").strip(),
+                    "unidad": (row.get("unidad") or "").strip(),
+                    "perfil": (row.get("perfil") or "").strip(),
+                    "horas_min": float(row.get("horas_min") or 0.0),
+                    "horas_tipicas": float(row.get("horas_tipicas") or 0.0),
+                    "horas_max": float(row.get("horas_max") or 0.0),
+                    "nota": (row.get("nota") or "").strip(),
+                }
+                for row in reader
+                if (row.get("tipo_actividad") or "").strip()
+            ]
+
+    distribucion_path = KNOWLEDGE_DIR / "distribucion_fases.csv"
+    phases_rows: list[dict[str, Any]] = []
+    if distribucion_path.exists():
+        with open(distribucion_path, mode="r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            phases_rows = [
+                {
+                    "fase": (row.get("fase") or "").strip(),
+                    "pct_min": float(row.get("pct_min") or 0.0),
+                    "pct_tipico": float(row.get("pct_tipico") or 0.0),
+                    "pct_max": float(row.get("pct_max") or 0.0),
+                    "nota": (row.get("nota") or "").strip(),
+                }
+                for row in reader
+                if (row.get("fase") or "").strip()
+            ]
+
+    factores_path = KNOWLEDGE_DIR / "factores_ajuste.csv"
+    factors_count = 0
+    if factores_path.exists():
+        with open(factores_path, mode="r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            factors_count = sum(1 for row in reader if (row.get("factor") or "").strip())
+
+    history = load_history()
+
+    return {
+        "benchmarks_count": len(benchmarks_rows),
+        "phases_distribution": phases_rows,
+        "distribucion_fases": phases_rows,
+        "factors_count": factors_count,
+        "historical_projects_count": len(history),
+        "benchmarks_actividades": benchmarks_rows,
+    }
 
 DEFAULT_STACK_CATALOG = {
     "hosting_compartido": {
@@ -83,8 +154,138 @@ def load_history() -> list[dict]:
         ]
 
 
-def similar_history(tech: str, complexity: str) -> list[dict]:
-    # shortcut: coincidencia por palabras de tecnología + complejidad; upgrade a embeddings/RAG cuando haya volumen
+def _normalize_text(text: str) -> str:
+    if not text:
+        return ""
+    norm = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    return norm.lower()
+
+
+def _extract_ngrams(text: str) -> list[str]:
+    norm = _normalize_text(text)
+    words = re.findall(r"\b[a-z0-9_]{2,}\b", norm)
+    features: list[str] = list(words)
+    for w in words:
+        if len(w) >= 4:
+            for i in range(len(w) - 3):
+                features.append(w[i : i + 4])
+    return features
+
+
+def _cosine_similarity(vec_a: dict[str, float], vec_b: dict[str, float]) -> float:
+    dot_product = sum(vec_a[k] * vec_b.get(k, 0.0) for k in vec_a if k in vec_b)
+    norm_a = math.sqrt(sum(v * v for v in vec_a.values()))
+    norm_b = math.sqrt(sum(v * v for v in vec_b.values()))
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return dot_product / (norm_a * norm_b)
+
+
+def retrieve_similar_rag(
+    query_text: str,
+    tech: str = "",
+    complexity: str = "media",
+    top_k: int = 5,
+) -> list[dict[str, Any]]:
+    # 1. Pool desde CSV
+    candidates: list[dict[str, Any]] = [
+        {
+            "nombre": row.get("nombre", ""),
+            "tecnologias": row.get("tecnologias", ""),
+            "complejidad": row.get("complejidad", "media"),
+            "fase": row.get("fase", "General"),
+            "horas_reales": float(row.get("horas_reales", 0.0)),
+            "source": "historico_csv",
+        }
+        for row in load_history()
+    ]
+
+    # 2. Pool desde SQLite (estimaciones aprobadas)
+    try:
+        from .store import list_estimations
+        saved = list_estimations()
+        for s in saved:
+            if s.get("status") == "approved":
+                payload_str = s.get("payload_json") or ""
+                payload: dict[str, Any] = {}
+                if payload_str:
+                    try:
+                        payload = json.loads(payload_str)
+                    except Exception:
+                        payload = {}
+                techs = ""
+                if payload.get("recommended_technologies"):
+                    techs = " ".join(payload["recommended_technologies"])
+                elif payload.get("project", {}).get("technology"):
+                    techs = payload["project"]["technology"]
+
+                candidates.append({
+                    "nombre": s.get("project_name") or payload.get("project_name") or "Estimación Aprobada",
+                    "tecnologias": techs,
+                    "complejidad": payload.get("complexity", "media"),
+                    "fase": "General",
+                    "horas_reales": float(payload.get("total_expected_hours", 0.0)),
+                    "source": "estimacion_aprobada",
+                })
+    except Exception:
+        pass
+
+    if not candidates:
+        return []
+
+    # 3. TF-IDF + Cosine Similarity
+    full_query = f"{query_text} {tech} {complexity}".strip()
+    query_features = _extract_ngrams(full_query)
+    doc_features = [
+        _extract_ngrams(f"{c['nombre']} {c['tecnologias']} {c['complejidad']} {c['fase']}")
+        for c in candidates
+    ]
+
+    all_docs = [query_features] + doc_features
+    total_docs = len(all_docs)
+
+    df: Counter[str] = Counter()
+    for doc in all_docs:
+        for t in set(doc):
+            df[t] += 1
+
+    idf: dict[str, float] = {
+        token: math.log((total_docs + 1) / (count + 1)) + 1.0
+        for token, count in df.items()
+    }
+
+    q_counts = Counter(query_features)
+    query_vec = {t: count * idf.get(t, 1.0) for t, count in q_counts.items()}
+
+    query_tech_words = set(re.findall(r"\w+", (tech or "").lower()))
+    comp_target = (complexity or "").strip().lower()
+
+    scored_candidates: list[dict[str, Any]] = []
+    for cand, c_feats in zip(candidates, doc_features):
+        c_counts = Counter(c_feats)
+        cand_vec = {t: count * idf.get(t, 1.0) for t, count in c_counts.items()}
+        base_cosine = _cosine_similarity(query_vec, cand_vec)
+
+        cand_tech_words = set(re.findall(r"\w+", (cand["tecnologias"] or "").lower()))
+        tech_bonus = 0.0
+        if query_tech_words and (query_tech_words & cand_tech_words):
+            overlap_count = len(query_tech_words & cand_tech_words)
+            tech_bonus = min(0.20, 0.08 * overlap_count)
+
+        comp_bonus = 0.05 if cand["complejidad"].lower() == comp_target else 0.0
+        final_score = min(1.0, max(0.0, base_cosine + tech_bonus + comp_bonus))
+
+        item = dict(cand)
+        item["similarity"] = round(final_score, 2)
+        scored_candidates.append(item)
+
+    scored_candidates.sort(key=lambda x: (x["similarity"], x["horas_reales"]), reverse=True)
+    return scored_candidates[:top_k]
+
+
+def similar_history(tech: str, complexity: str, query_text: str = "") -> list[dict]:
+    if query_text:
+        return retrieve_similar_rag(query_text=query_text, tech=tech, complexity=complexity)
     history = load_history()
     if not history:
         return []
@@ -96,7 +297,14 @@ def similar_history(tech: str, complexity: str) -> list[dict]:
         if (tech_words and (tech_words & set(re.findall(r"\w+", item["tecnologias"].lower()))))
         or (comp_norm and item["complejidad"] == comp_norm)
     ]
-    return matches if matches else history
+    res = matches if matches else history
+    # shortcut: compatibilidad retroactiva de atributos source y similarity
+    for item in res:
+        if "source" not in item:
+            item["source"] = "historico_csv"
+        if "similarity" not in item:
+            item["similarity"] = 0.5
+    return res
 
 
 def import_file(kind: Literal["tarifas", "historicos"], filename: str, content: bytes) -> int:

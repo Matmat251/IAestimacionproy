@@ -1,6 +1,6 @@
 from langgraph.graph import END, START, StateGraph
 
-from ..models import Activity, Audit, DraftRequest, DraftResponse, Plan, Requirement, Risk, TechJustification
+from ..models import Activity, Audit, DraftRequest, DraftResponse, Plan, RagEvidence, Requirement, Risk, TechJustification
 from .analyst import analista_node, route_analista
 from .architect import arquitecto_node
 from .auditor import auditor_node, route_auditor
@@ -61,6 +61,11 @@ def create_draft(request: DraftRequest) -> DraftResponse:
         TechJustification.model_validate(t)
         for t in state.get("tech_justifications", [])
     ]
+    rag_evidence = [
+        RagEvidence.model_validate(h)
+        for h in state.get("similar_history", [])
+        if isinstance(h, dict) and "nombre" in h
+    ]
 
     return DraftResponse(
         project_name=request.project.name,
@@ -78,4 +83,5 @@ def create_draft(request: DraftRequest) -> DraftResponse:
         tech_justifications=tech_justifications,
         plan=plan,
         audit=audit,
+        rag_evidence=rag_evidence,
     )

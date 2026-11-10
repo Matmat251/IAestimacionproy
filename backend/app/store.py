@@ -49,7 +49,7 @@ def save_estimation(draft: DraftResponse, reviewer: str, comment: str, status: s
 def list_estimations() -> list[dict[str, Any]]:
     conn = _get_connection()
     cursor = conn.execute(
-        "SELECT id, project_name, status, reviewer, comment, created_at FROM estimations ORDER BY id DESC"
+        "SELECT id, project_name, status, reviewer, comment, payload_json, created_at FROM estimations ORDER BY id DESC"
     )
     return [dict(row) for row in cursor.fetchall()]
 

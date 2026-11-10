@@ -23,7 +23,7 @@ BASE_ACTIVITIES = [
         "optimistic_hours": 4.0,
         "most_likely_hours": 8.0,
         "pessimistic_hours": 16.0,
-        "rationale": "Base demostrativa; ajustar según alcance y complejidad.",
+        "rationale": "Benchmark: levantamiento_requisitos (16-32-64h); base demostrativa adaptada al alcance.",
     },
     {
         "id": "A2",
@@ -37,7 +37,7 @@ BASE_ACTIVITIES = [
         "optimistic_hours": 4.0,
         "most_likely_hours": 8.0,
         "pessimistic_hours": 16.0,
-        "rationale": "Base demostrativa; validar integraciones y restricciones.",
+        "rationale": "Benchmark: diseno_arquitectura (16-32-64h); validación técnica y contratos.",
     },
     {
         "id": "A3",
@@ -51,7 +51,7 @@ BASE_ACTIVITIES = [
         "optimistic_hours": 16.0,
         "most_likely_hours": 40.0,
         "pessimistic_hours": 80.0,
-        "rationale": "Estimación demostrativa; requiere desglose por funcionalidades.",
+        "rationale": "Benchmark: autenticacion_basica y crud_entidad; construcción modular del núcleo.",
     },
     {
         "id": "A4",
@@ -65,7 +65,7 @@ BASE_ACTIVITIES = [
         "optimistic_hours": 6.0,
         "most_likely_hours": 12.0,
         "pessimistic_hours": 24.0,
-        "rationale": "Base demostrativa; confirmar estrategia y cobertura de pruebas.",
+        "rationale": "Benchmark: plan_pruebas_qa (8-16-32h) y pruebas_funcionales; cobertura de calidad.",
     },
     {
         "id": "A5",
@@ -79,7 +79,7 @@ BASE_ACTIVITIES = [
         "optimistic_hours": 2.0,
         "most_likely_hours": 6.0,
         "pessimistic_hours": 12.0,
-        "rationale": "Base demostrativa; validar ambientes y plan de liberación.",
+        "rationale": "Benchmark: configuracion_ci_cd (8-16-32h) y despliegue_vps; liberación de ambientes.",
     },
 ]
 

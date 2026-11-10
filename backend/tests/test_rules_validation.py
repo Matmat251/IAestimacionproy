@@ -153,3 +153,56 @@ def test_parametric_warnings_pm_and_undocumented_api():
     )
 
     assert any("con API no documentada" in w for w in warnings)
+
+
+def test_architect_safeguard_supplements_missing_qa_and_phases(monkeypatch):
+    from app.agents.architect import ArchActivity, ArchResponse, arquitecto_node
+    from app.agents.state import AgentState
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "groq_api_key", "mock_key")
+
+    def mock_call_llm(prompt, response_model):
+        return ArchResponse(
+            complexity="media",
+            infra_profile="vps",
+            activities=[
+                ArchActivity(
+                    id="A1",
+                    phase="Desarrollo",
+                    name="Codificación del feature",
+                    profile="Desarrollador",
+                    categoria="desarrollo",
+                    optimistic_hours=8,
+                    most_likely_hours=16,
+                    pessimistic_hours=24,
+                    rationale="Benchmark: crud_entidad",
+                )
+            ],
+        )
+
+    monkeypatch.setattr("app.agents.architect.call_llm", mock_call_llm)
+
+    state: AgentState = {
+        "request": DraftRequest(
+            project=ProjectInput(
+                name="Proyecto Test",
+                description="Test de salvaguarda arquitecto",
+                scope="Desarrollo básico",
+                technology="Python FastAPI",
+                integrations="",
+                constraints="",
+            )
+        ),
+        "rates": {"Desarrollador": {}, "QA": {}, "Analista funcional": {}, "Arquitecto / Tech Lead": {}, "DevOps": {}},
+        "similar_history": [{"nombre": "P1", "fase": "Desarrollo", "tecnologias": "Python", "complejidad": "media", "horas_reales": 100}],
+        "requirements": [{"id": "R1", "title": "R1", "detail": "d", "kind": "functional"}],
+    }
+
+    result = arquitecto_node(state)
+    acts = result["activities"]
+    phases = [a["phase"].lower() for a in acts]
+    assert len(acts) >= 4
+    assert "qa" in phases
+    assert any("salvaguarda WBS" in n for n in result["notes"])
+

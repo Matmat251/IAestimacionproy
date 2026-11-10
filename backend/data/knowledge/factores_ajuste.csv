@@ -1,0 +1,9 @@
+factor,multiplicador,aplica_a,cuando_usar
+equipo_nuevo_en_tecnologia,1.20,Desarrollo,"El equipo no ha usado el stack antes"
+api_externa_sin_documentacion,1.50,Integraciones,"No hay docs ni sandbox"
+requisitos_cambiantes,1.30,Todo,"Cliente indica alcance abierto o en definición"
+cumplimiento_normativo,1.15,Desarrollo y QA,"PCI-DSS, GDPR, ley de datos personales"
+multiplataforma_movil,1.25,Desarrollo móvil,"iOS + Android con builds nativos separados"
+datos_legados_sucios,1.40,Migración,"Origen sin normalizar o sin documentación"
+equipo_con_experiencia_previa,0.85,Desarrollo,"Proyecto similar entregado antes por el mismo equipo"
+reutilizacion_componentes,0.80,Desarrollo,"Existe base de código o plantilla reutilizable"

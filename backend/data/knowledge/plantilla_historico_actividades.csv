@@ -1,0 +1,11 @@
+proyecto,anio,tecnologias,infra,complejidad,fase,tipo_actividad,perfil,horas_estimadas,horas_reales,notas
+Portal Clientes,2025,React Node PostgreSQL,vps,media,Análisis,levantamiento_requisitos,Analista funcional,32,36,"Entrevistas con stakeholders completadas a tiempo"
+Portal Clientes,2025,React Node PostgreSQL,vps,media,Diseño,diseno_arquitectura,Arquitecto / Tech Lead,32,28,"Definición de modelo relacional y contratos OpenAPI"
+Portal Clientes,2025,React Node PostgreSQL,vps,media,Desarrollo,autenticacion_basica,Desarrollador,24,26,"JWT con refresh tokens y validación de correo"
+Portal Clientes,2025,React Node PostgreSQL,vps,media,Desarrollo,crud_entidad,Desarrollador,16,18,"Gestión de facturas y visualización de cuentas"
+Ecommerce B2C Pasarela,2025,Next.js Node Stripe,cloud,alta,Desarrollo,integracion_pasarela_pago,Desarrollador,40,48,"Integración Stripe con webhooks de reintento"
+Ecommerce B2C Pasarela,2025,Next.js Node Stripe,cloud,alta,QA,pruebas_funcionales,QA,16,20,"Pruebas e2e de checkout y pasarela en sandbox"
+App Movil Logistica,2025,Flutter FastAPI PostgreSQL,cloud,alta,Desarrollo,geolocalizacion_mapas,Desarrollador,40,44,"Tracking en tiempo real de rutas de choferes"
+App Movil Logistica,2025,Flutter FastAPI PostgreSQL,cloud,alta,Despliegue,despliegue_cloud_gestionado,DevOps,24,22,"Infraestructura AWS ECS Fargate y RDS Aurora"
+Dashboard Analitico BI,2025,React Python BigQuery,vps,media,QA,plan_pruebas_qa,QA,16,14,"Estrategia de validación de métricas y exportación"
+Integracion ERP SAP,2025,Java Spring Oracle,cloud,alta,Gestión de proyecto,gestion_proyecto,Jefe de proyecto,40,38,"Seguimiento semanal y control de hitos con cliente"

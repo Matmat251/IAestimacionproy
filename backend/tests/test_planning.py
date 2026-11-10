@@ -76,3 +76,39 @@ def test_audit_estimation_rules():
     assert any("Ausencia de actividad de fase 'QA'" in f for f in findings)
     # Total de horas de activities es 6.7 + 4 = 10.7h vs 100h histórico (>50% desvío)
     assert any("se desvía más del 50%" in f for f in findings)
+
+
+def test_monte_carlo_p50_p80_simulation():
+    acts = [
+        Activity(
+            id="A1",
+            phase="Desarrollo",
+            name="Backend API",
+            profile="Desarrollador",
+            optimistic_hours=10.0,
+            most_likely_hours=20.0,
+            pessimistic_hours=40.0,
+            rationale="",
+        ),
+        Activity(
+            id="A2",
+            phase="QA",
+            name="Pruebas",
+            profile="QA",
+            optimistic_hours=5.0,
+            most_likely_hours=10.0,
+            pessimistic_hours=20.0,
+            rationale="",
+        ),
+    ]
+    rates = {
+        "Desarrollador": {"tarifa_hora": 30.0, "capacidad_semanal": 40.0},
+        "QA": {"tarifa_hora": 20.0, "capacidad_semanal": 40.0},
+    }
+    plan = build_plan(acts, rates)
+    assert plan.p50_hours > 0.0
+    assert plan.p80_hours > 0.0
+    assert plan.p50_hours <= plan.p80_hours
+    assert plan.p50_cost <= plan.p80_cost
+    assert plan.p50_cost > 0.0
+

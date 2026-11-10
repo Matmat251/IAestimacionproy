@@ -14,8 +14,9 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from .agent import create_draft
 from .config import settings
-from .models import DraftRequest, DraftResponse, ReviewRequest
-from .reference import import_file, load_history, load_rates
+from .models import Audit, DraftRequest, DraftResponse, ReviewRequest
+from .planning import build_plan, validate_estimation_rules
+from .reference import import_file, load_history, load_knowledge_summary, load_rates, rates_by_profile
 from .store import get_estimation, list_estimations, save_estimation
 
 app = FastAPI(title="Prototipo estimador de proyectos TI", version="0.2.0")
@@ -42,6 +43,35 @@ def health():
 @app.post("/api/estimate/draft", response_model=DraftResponse)
 def draft_estimate(request: DraftRequest):
     return create_draft(request)
+
+
+@app.post("/api/estimate/recalculate", response_model=DraftResponse)
+def recalculate_estimate(draft: DraftResponse):
+    rates = rates_by_profile()
+    activities = draft.activities
+    total_hours = round(sum(a.expected_hours for a in activities), 1)
+    plan = build_plan(activities, rates)
+
+    similar_hist = [h.model_dump() for h in draft.rag_evidence] if draft.rag_evidence else load_history()
+    findings, warnings = validate_estimation_rules(
+        activities=activities,
+        plan=plan,
+        rates=rates,
+        similar_hist=similar_hist,
+        infra_profile=draft.infra_profile or "vps",
+        tech_justifications=draft.tech_justifications,
+        requirements=draft.requirements,
+    )
+    audit = Audit(
+        approved=len(findings) == 0,
+        findings=findings,
+        warnings=warnings,
+        iterations=draft.audit.iterations if draft.audit else 1,
+    )
+    draft.total_expected_hours = total_hours
+    draft.plan = plan
+    draft.audit = audit
+    return draft
 
 
 @app.post("/api/estimate/review")
@@ -73,6 +103,11 @@ def get_single_estimation(est_id: int):
     if not est:
         raise HTTPException(status_code=404, detail="Estimación no encontrada")
     return est
+
+
+@app.get("/api/reference/knowledge")
+def get_knowledge_reference():
+    return load_knowledge_summary()
 
 
 @app.get("/api/reference/{kind}")

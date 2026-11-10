@@ -109,6 +109,10 @@ class Plan(BaseModel):
     roles: list[RoleCost]
     duration_weeks: float
     total_cost: float
+    p50_hours: float = 0.0
+    p80_hours: float = 0.0
+    p50_cost: float = 0.0
+    p80_cost: float = 0.0
 
 
 class Audit(BaseModel):
@@ -116,6 +120,16 @@ class Audit(BaseModel):
     findings: list[str]
     warnings: list[str] = Field(default_factory=list)
     iterations: int
+
+
+class RagEvidence(BaseModel):
+    nombre: str
+    tecnologias: str = ""
+    complejidad: str = "media"
+    fase: str = "General"
+    horas_reales: float = 0.0
+    similarity: float = 0.0
+    source: Literal["historico_csv", "estimacion_aprobada"] = "historico_csv"
 
 
 class DraftRequest(BaseModel):
@@ -139,6 +153,7 @@ class DraftResponse(BaseModel):
     tech_justifications: list[TechJustification] = Field(default_factory=list)
     plan: Plan | None = None
     audit: Audit | None = None
+    rag_evidence: list[RagEvidence] = Field(default_factory=list)
 
 
 class ReviewRequest(BaseModel):
